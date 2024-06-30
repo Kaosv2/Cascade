@@ -1,14 +1,44 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
-import mysql.connector 
+import sqlite3  
 from datetime import datetime, timedelta
+from PyQt5.QtWidgets import QToolTip
+from PyQt5.QtGui import QFont
+import resourcesCascade
 
 class Ui_Timer(object):
     def __init__(self, timer_dialog):
         self.timer_dialog = timer_dialog
+        self.create_tables()
         course_list=self.display_courses()
         self.subject_timers = {subject: 0 for subject in course_list}
         self.current_subject = None
         self.start_time = None
+
+    def create_tables(self):
+        # Connect to the SQLite database
+        conn = sqlite3.connect('cascade_project.db')
+        cursor = conn.cursor()
+
+        # Create the 'timer' table if it doesn't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS timer (
+                subject TEXT PRIMARY KEY,
+                time INTEGER
+            )
+        ''')
+
+        # Create the 'time_per_day' table if it doesn't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS time_per_day (
+                day DATE PRIMARY KEY,
+                time INTEGER
+            )
+        ''')
+
+        # Commit the changes and close the connection
+        conn.commit()
+        cursor.close()
+        conn.close()
 
     def setupUi(self, Timer):
         self.timer_dialog.setObjectName("Timer")
@@ -63,12 +93,15 @@ class Ui_Timer(object):
         self.opacity_slider.setStyleSheet("QSlider::sub-page:horizontal {; background: #634B89;}\n"
                                           "QSlider::add-page:horizontal {; background: #fff;}\n"
                                           "QSlider::handle:horizontal { ; border-radius: 2px; background-color: rgb(50, 24, 92); }\n"
-                                          "")
+                                          "QToolTip { background-color: rgb(167, 145, 203); color: black; border: 1px solid black;}")
         self.opacity_slider.setMinimum(10)
         self.opacity_slider.setMaximum(100)
         self.opacity_slider.setSingleStep(10)
         self.opacity_slider.setOrientation(QtCore.Qt.Horizontal)
         self.opacity_slider.setObjectName("opacity_slider")
+        self.opacity_slider.setToolTip("Adjust Opacity")
+        QToolTip.setFont(QFont('Montserrat', 10))
+
 
         self.retranslateUi(Timer)
         QtCore.QMetaObject.connectSlotsByName(Timer)
@@ -90,7 +123,9 @@ class Ui_Timer(object):
 
     def retranslateUi(self, Timer):
         _translate = QtCore.QCoreApplication.translate
-        Timer.setWindowTitle(_translate("Timer", "Dialog"))
+        icon = QtGui.QIcon(":/images/images for cascade/dark_timer_icon.png")
+        Timer.setWindowIcon(icon)
+        Timer.setWindowTitle(_translate("Timer", "Timer"))
         self.start_button.setText(_translate("Timer", "Start"))
         self.stop_button.setText(_translate("Timer", "Stop"))
 
@@ -139,109 +174,76 @@ class Ui_Timer(object):
             self.timer_number.setTime(QtCore.QTime(0, self.countdown_seconds // 60, self.countdown_seconds % 60))
 
     def set_opacity(self, value):
-        opacity = 1 - (value / 100.0)
+        min_opacity = 0.2  
+        opacity = max(1 - (value / 100.0), min_opacity)
         self.timer_dialog.setWindowOpacity(opacity)
 
     def on_dialog_accepted(self):
-        # Dialog accepted (e.g., OK button clicked)
         pass
 
     def update_time(self, subject, time):
-        # Connect to the database
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='kuhu2004',
-            database='cascade_project'
-        )
-
-        # Create a cursor object
-        cursor = conn.cursor(buffered=True)
+        # Connect to the SQLite database
+        conn = sqlite3.connect('cascade_project.db')
+        cursor = conn.cursor()
 
         # Check if the subject exists
-        select_query = "SELECT COUNT(*) FROM timer WHERE subject = %s"
-        cursor.execute(select_query, (subject,))
+        cursor.execute("SELECT COUNT(*) FROM timer WHERE subject = ?", (subject,))
         subject_exists = cursor.fetchone()[0]
 
         if subject_exists:
             # Update existing row
-            update_query = "UPDATE timer SET time = time + %s WHERE subject = %s"
-            cursor.execute(update_query, (time, subject))
+            cursor.execute("UPDATE timer SET time = time + ? WHERE subject = ?", (time, subject))
         else:
             # Insert new row
-            insert_query = "INSERT INTO timer(subject, time) VALUES (%s, %s)"
-            cursor.execute(insert_query, (subject, time))
+            cursor.execute("INSERT INTO timer(subject, time) VALUES (?, ?)", (subject, time))
 
         # Commit the transaction
         conn.commit()
-
-        # Close the cursor and connection
         cursor.close()
-        conn.close
-
+        conn.close()
 
     def update_or_insert_timer_usage(self, time):
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='kuhu2004',
-            database='cascade_project'
-        )
-        """Updates or inserts timer usage data in the database."""
+        # Connect to the SQLite database
+        conn = sqlite3.connect('cascade_project.db')
         cursor = conn.cursor()
 
         current_date = datetime.now().date()
 
         # Check if the current date exists in the table
-        select_query = "SELECT COUNT(*) FROM time_per_day WHERE day = %s"
-        cursor.execute(select_query, (current_date,))
+        cursor.execute("SELECT COUNT(*) FROM time_per_day WHERE day = ?", (current_date,))
         date_exists = cursor.fetchone()[0]
 
         if date_exists:
             # Update existing row
-            update_query = "UPDATE time_per_day SET time = time + %s WHERE day = %s"
-            cursor.execute(update_query, (time, current_date))
+            cursor.execute("UPDATE time_per_day SET time = time + ? WHERE day = ?", (time, current_date))
         else:
             # Insert new row
-            insert_query = "INSERT INTO time_per_day (day, time) VALUES (%s, %s)"
-            cursor.execute(insert_query, (current_date, time))
+            cursor.execute("INSERT INTO time_per_day (day, time) VALUES (?, ?)", (current_date, time))
 
         conn.commit()
         cursor.close()
         conn.close()
-    
+
     def on_dialog_rejected(self):
         # Dialog rejected (e.g., close button clicked)
         # Display total time spent on each subject
-        print("Total time spent on each subject:")
         for subject, time_spent in self.subject_timers.items():
-            print(f"{subject}: {time_spent} seconds")
             self.update_time(subject,time_spent)
             self.update_or_insert_timer_usage(time_spent)
-            
 
     def display_courses(self):
-        # Connect to the database
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='kuhu2004',
-            database='cascade_project'
-        )
-        
+        # Connect to the SQLite database
+        conn = sqlite3.connect('cascade_project.db')
+        cursor = conn.cursor()
+
         # Fetch the course name from the table
-        cursor = conn.cursor(buffered=True)
         cursor.execute("SELECT name FROM courses")
         course_name = cursor.fetchall()
-        course_list=[]
-                
-        for i in range(len(course_name)):
-                course_list.append(course_name[i][0])
+        course_list = [name[0] for name in course_name]
 
         cursor.close()
         conn.close()
-
-        return(course_list)
+        return course_list
     
     
 
