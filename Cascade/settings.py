@@ -9,27 +9,64 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QLabel, QApplication, QWidget, QVBoxLayout, QMainWindow
+from PyQt5.QtWidgets import QLabel, QApplication, QWidget, QVBoxLayout, QMainWindow,QMessageBox, QDialog, QComboBox, QPushButton,QAbstractItemView
 import resourcesCascade
 from PyQt5.QtGui import QPixmap
-from add_course_settings import Ui_add_course_settings
+from add_course_setting import Ui_add_course_settings
 from course_manager import CourseManager
-import mysql.connector
-
+import sqlite3
+import sys
+import mainpage
+from PyQt5.QtCore import pyqtSignal, QObject
 
 class Ui_settings(object):
     
+    def __init__(self, main_window):
+        self.main_window = main_window
+        self.course_updated_signal = pyqtSignal()
+    
+    def openMainpage(self):
+        self.main_window.close()
+
     def openAddCourses(self,event):
         self.window = QtWidgets.QMainWindow()
         self.ui = Ui_add_course_settings()
         self.ui.setupUi(self.window)
+        self.ui.settings = self         
         self.window.show()
+
+    def refresh_courses(self):
+        # Connect to the SQLite database
+        conn = sqlite3.connect('cascade_project.db')
+        
+        # Fetch the course name from the table
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM courses")
+        course_name = cursor.fetchall()
+
+        # Clear existing course labels
+        self.course1.setText("---")
+        self.course2.setText("---")
+        self.course3.setText("---")
+        self.course4.setText("---")
+
+        # Update course labels based on fetched data
+        for i, course in enumerate(course_name):
+            if i == 0:
+                self.course1.setText(course[0])
+            elif i == 1:
+                self.course2.setText(course[0])
+            elif i == 2:
+                self.course3.setText(course[0])
+            elif i == 3:
+                self.course4.setText(course[0])
+        cursor.close()
+        conn.close()
 
     def setupUi(self, settings):
         settings.setObjectName("settings")
         settings.resize(1211, 807)
-        settings.setStyleSheet("background-color: rgb(37, 60, 105);\n"
-"")
+        settings.setStyleSheet("background-color: rgb(27, 32, 81);")
         self.centralwidget = QtWidgets.QWidget(settings)
         self.centralwidget.setObjectName("centralwidget")
         self.bg = QtWidgets.QLabel(self.centralwidget)
@@ -111,6 +148,7 @@ class Ui_settings(object):
         icon.addPixmap(QPixmap(":/images/images for cascade/homepage_icon.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.homepage.setIcon(icon)
         self.homepage.setObjectName("homepage")
+        self.homepage.clicked.connect(self.openMainpage)
         self.help = QtWidgets.QPushButton(self.centralwidget)
         self.help.setGeometry(QtCore.QRect(1160, 30, 31, 28))
         self.help.setStyleSheet("background-color: rgb(255, 255, 255);\n"
@@ -126,6 +164,19 @@ class Ui_settings(object):
 "background-color: rgb(167, 145, 203,0.2);")
         self.main_box.setText("")
         self.main_box.setObjectName("main_box")
+        
+        self.domainbox = QtWidgets.QLabel(self.centralwidget)
+        self.domainbox.setGeometry(QtCore.QRect(680, 255, 421, 151))
+        self.domainbox.setStyleSheet("border-radius: 17px; background-color: rgb(67, 74, 138,0.5);")
+        self.domainbox.setText("")
+        self.domainbox.setObjectName("main_box")
+
+        self.coursebox = QtWidgets.QLabel(self.centralwidget)
+        self.coursebox.setGeometry(QtCore.QRect(110, 253, 481, 421))
+        self.coursebox.setStyleSheet("border-radius: 17px; background-color: rgb(67, 74, 138,0.5);")
+        self.coursebox.setText("")
+        self.coursebox.setObjectName("main_box")
+
         self.main_box_2 = QtWidgets.QLabel(self.centralwidget)
         self.main_box_2.setGeometry(QtCore.QRect(90, 150, 1031, 551))
         self.main_box_2.setStyleSheet("border-radius: 17px;\n"
@@ -164,154 +215,88 @@ class Ui_settings(object):
 "qproperty-alignment: AlignLeft;\n"
 "")
         self.courses_title.setObjectName("courses_title")
-        self.nav_line_3 = QtWidgets.QLabel(self.widget)
-        self.nav_line_3.setGeometry(QtCore.QRect(10, 70, 400, 1))
-        self.nav_line_3.setStyleSheet("\n"
-"background: qlineargradient(x1:0, y1:0, x2:1, y2:0,\n"
-"    stop:0 rgba(255, 255, 255, 200),\n"
-"    stop:1 rgba(255, 255, 255, 0));")
-        self.nav_line_3.setText("")
-        self.nav_line_3.setObjectName("nav_line_3")
-        self.checkBox_1 = QtWidgets.QCheckBox(self.widget)
-        self.checkBox_1.setGeometry(QtCore.QRect(10, 90, 21, 31))
-        self.checkBox_1.setStyleSheet("QCheckBox {\n"
-"    background-color: rgb(255, 255, 255, 0);\n"
-"    font: 12pt \"Montserrat\";\n"
-"    color: rgb(195, 195, 195);\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    border: 1px solid #c3c3c3;\n"
-"    background: none;\n"
-"    border-radius:3px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #c3c3c3;\n"
-"    background-color: rgb(0,0,0,0);\n"
-"    border-radius: 5px;\n"
-"    image: url(\"C:/Users/Saanvi Sharma/Documents/PE2/checkmark.png\");\n"
-"}\n"
-"\n"
+
+        self.domain_title = QtWidgets.QLabel(self.centralwidget)
+        self.domain_title.setGeometry(QtCore.QRect(930, 260, 191, 61))
+        self.domain_title.setStyleSheet("background: transparent;\n"
+"font: 23pt \"Montserrat\";\n"
+"font-weight: bold;\n"
+"color: rgb(167, 145, 203);\n"
+"qproperty-alignment: AlignLeft;\n"
 "")
-        self.checkBox_1.setText("")
-        self.checkBox_1.setCheckable(True)
-        self.checkBox_1.setChecked(False)
-        self.checkBox_1.setTristate(False)
-        self.checkBox_1.setObjectName("checkBox_1")
-        self.checkBox_2 = QtWidgets.QCheckBox(self.widget)
-        self.checkBox_2.setGeometry(QtCore.QRect(10, 130, 21, 42))
-        self.checkBox_2.setStyleSheet("QCheckBox {\n"
-"    background-color: rgb(255, 255, 255, 0);\n"
-"    font: 12pt \"Montserrat\";\n"
-"    color: rgb(195, 195, 195);\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    border: 1px solid #c3c3c3;\n"
-"    background: none;\n"
-"    border-radius:3px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #c3c3c3;\n"
-"    background-color: rgb(0,0,0,0);\n"
-"    border-radius: 5px;\n"
-"    image: url(\"C:/Users/Saanvi Sharma/Documents/PE2/checkmark.png\");\n"
-"}\n"
-"\n"
-"")
-        self.checkBox_2.setText("")
-        self.checkBox_2.setObjectName("checkBox_2")
-        self.checkBox_3 = QtWidgets.QCheckBox(self.widget)
-        self.checkBox_3.setGeometry(QtCore.QRect(10, 180, 21, 42))
-        self.checkBox_3.setStyleSheet("QCheckBox {\n"
-"    background-color: rgb(255, 255, 255, 0);\n"
-"    font: 12pt \"Montserrat\";\n"
-"    color: rgb(195, 195, 195);\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    border: 1px solid #c3c3c3;\n"
-"    background: none;\n"
-"    border-radius:3px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #c3c3c3;\n"
-"    background-color: rgb(0,0,0,0);\n"
-"    border-radius: 5px;\n"
-"    image: url(\"C:/Users/Saanvi Sharma/Documents/PE2/checkmark.png\");\n"
-"}\n"
-"\n"
-"")
-        self.checkBox_3.setText("")
-        self.checkBox_3.setObjectName("checkBox_3")
-        self.checkBox_4 = QtWidgets.QCheckBox(self.widget)
-        self.checkBox_4.setGeometry(QtCore.QRect(10, 230, 21, 42))
-        self.checkBox_4.setStyleSheet("QCheckBox {\n"
-"    background-color: rgb(255, 255, 255, 0);\n"
-"    font: 12pt \"Montserrat\";\n"
-"    color: rgb(195, 195, 195);\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    border: 1px solid #c3c3c3;\n"
-"    background: none;\n"
-"    border-radius:3px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #c3c3c3;\n"
-"    background-color: rgb(0,0,0,0);\n"
-"    border-radius: 5px;\n"
-"    image: url(\"C:/Users/Saanvi Sharma/Documents/PE2/checkmark.png\");\n"
-"}\n"
-"\n"
-"")
-        self.checkBox_4.setText("")
-        self.checkBox_4.setObjectName("checkBox_4")
+        self.domain_title.setText("Domain")
+        self.domain_title.setObjectName("domain_title")
+        self.dropdown = QtWidgets.QComboBox(settings)
+        self.dropdown.setGeometry(QtCore.QRect(890, 320, 201, 41))
+        self.dropdown.addItem("Select your domain")
+        self.dropdown.addItems(["Computer Science", "Mathematics", "Physics", "Biology", "Commerce"])
+
+        # Connect the signal to the slot
+        self.dropdown.activated.connect(self.remove_placeholder)
+
+        self.dropdown.setStyleSheet("""
+QComboBox {
+    font: 10pt "Montserrat";
+    background-color: rgb(167, 145, 203);
+    color: rgb(255, 255, 255);
+    font-weight: 500;
+}
+
+QComboBox:on {
+    background-color: rgb(167, 145, 203); 
+}
+
+QComboBox QListView {
+    background-color: rgb(167, 145, 203); 
+    color: rgb(255, 255, 255); 
+    border: 1px solid rgb(100, 100, 100); 
+}
+
+QComboBox QListView::item {
+    background-color: transparent; 
+    color: rgb(255, 255, 255); 
+}
+
+""")
+
+
+        self.dropdown.currentIndexChanged.connect(self.handle_selection_change)
+        self.load_choice()
+
         self.course1 = QtWidgets.QLabel(self.widget)
         self.course1.setGeometry(QtCore.QRect(50, 100, 321, 31))
         self.course1.setStyleSheet("background-color: rgb(255, 255, 255,0);\n"
-"font: 8pt \"Montserrat\";\n"
+"font: 10pt \"Montserrat\";\n"
 "color: rgb(195, 195, 195);")
         self.course1.setObjectName("course1")
         self.course2 = QtWidgets.QLabel(self.widget)
         self.course2.setGeometry(QtCore.QRect(50, 140, 321, 31))
         self.course2.setStyleSheet("background-color: rgb(255, 255, 255,0);\n"
-"font: 8pt \"Montserrat\";\n"
+"font: 10pt \"Montserrat\";\n"
 "color: rgb(195, 195, 195);")
         self.course2.setObjectName("course2")
         self.course3 = QtWidgets.QLabel(self.widget)
         self.course3.setGeometry(QtCore.QRect(50, 190, 321, 31))
         self.course3.setStyleSheet("background-color: rgb(255, 255, 255,0);\n"
-"font: 8pt \"Montserrat\";\n"
+"font: 10pt \"Montserrat\";\n"
 "color: rgb(195, 195, 195);")
         self.course3.setObjectName("course3")
         self.course4 = QtWidgets.QLabel(self.widget)
         self.course4.setGeometry(QtCore.QRect(50, 240, 321, 31))
         self.course4.setStyleSheet("background-color: rgb(255, 255, 255,0);\n"
-"font: 8pt \"Montserrat\";\n"
+"font: 10pt \"Montserrat\";\n"
 "color: rgb(195, 195, 195);")
         self.course4.setObjectName("course4")
         self.delete_course_button = QtWidgets.QLabel(self.widget)
-        self.delete_course_button.setGeometry(QtCore.QRect(330, 10, 41, 51))
+        self.delete_course_button.mousePressEvent = self.delete_course
+        self.delete_course_button.setGeometry(QtCore.QRect(430, 10, 41, 51))
         self.delete_course_button.setStyleSheet("background-color: rgb(255, 255, 255,0);")
         self.delete_course_button.setText("")
         self.delete_course_button.setPixmap(QtGui.QPixmap(":/images/images for cascade/delete_note_icon.png"))
         self.delete_course_button.setObjectName("delete_course_button")
         self.add_course_button = QtWidgets.QLabel(self.widget)
         self.add_course_button.mousePressEvent = self.openAddCourses
-        self.add_course_button.setGeometry(QtCore.QRect(280, 20, 31, 31))
+        self.add_course_button.setGeometry(QtCore.QRect(380, 20, 31, 31))
         self.add_course_button.setStyleSheet("QLabel{\n"
 "    background-color: rgb(255, 255, 255,0);\n"
 "}\n"
@@ -324,13 +309,7 @@ class Ui_settings(object):
         self.add_course_button.setPixmap(QPixmap(":/images/images for cascade/create_note_icon.png"))
         self.add_course_button.setScaledContents(True)
         self.add_course_button.setObjectName("add_course_button")
-        self.edit_course_button_2 = QtWidgets.QLabel(self.widget)
-        self.edit_course_button_2.setGeometry(QtCore.QRect(380, 10, 41, 51))
-        self.edit_course_button_2.setStyleSheet("background-color: rgb(255, 255, 255,0);")
-        self.edit_course_button_2.setText("")
-        self.edit_course_button_2.setPixmap(QPixmap(":/images/images for cascade/edit_note_icon.png"))
-        self.edit_course_button_2.setObjectName("edit_course_button_2")
-        self.view_more_courses = QtWidgets.QPushButton(self.widget, clicked = lambda: self.openAddCourses())
+        self.view_more_courses = QtWidgets.QPushButton(self.widget)
         self.view_more_courses.setGeometry(QtCore.QRect(330, 290, 93, 28))
         self.view_more_courses.setStyleSheet("QPushButton {\n"
 "    background-color: rgba(185, 185, 185, 0);\n"
@@ -345,6 +324,7 @@ class Ui_settings(object):
 "}\n"
 "")
         self.view_more_courses.setObjectName("view_more_courses")
+        QtCore.QMetaObject.connectSlotsByName(settings)
         self.bg.raise_()
         self.logo_bg_shadow.raise_()
         self.logo.raise_()
@@ -362,7 +342,10 @@ class Ui_settings(object):
         self.main_box_2.raise_()
         self.settings_title.raise_()
         self.nav_line_2.raise_()
+        self.coursebox.raise_()
         self.widget.raise_()
+        self.domainbox.raise_()
+        self.domain_title.raise_()
         settings.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(settings)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1211, 26))
@@ -377,7 +360,9 @@ class Ui_settings(object):
 
     def retranslateUi(self, settings):
         _translate = QtCore.QCoreApplication.translate
-        settings.setWindowTitle(_translate("settings", "MainWindow"))
+        icon = QtGui.QIcon(":/images/images for cascade/settings.png")
+        settings.setWindowIcon(icon)
+        settings.setWindowTitle(_translate("settings", "Settings"))
         self.intro_nav.setText(_translate("settings", "Introduction"))
         self.studyplan_nav.setText(_translate("settings", "Study Plan"))
         self.calender_nav.setText(_translate("settings", "Calendar"))
@@ -387,6 +372,7 @@ class Ui_settings(object):
         self.contact_nav.setText(_translate("settings", "Contact"))
         self.settings_title.setText(_translate("settings", "Settings"))
         self.courses_title.setText(_translate("settings", "Courses"))
+        self.domain_title.setText(_translate("settings", "Domain"))
         self.course1.setText(_translate("settings", "---"))
         self.course2.setText(_translate("settings", "---"))
         self.course3.setText(_translate("settings", "---"))
@@ -395,39 +381,168 @@ class Ui_settings(object):
 
         self.display_coursename()
 
+    def remove_placeholder(self):
+        # Check if the current item is the placeholder
+        if self.dropdown.currentText() == "Select a course":
+            return  # Do nothing if the placeholder is selected
+
+        # Remove the placeholder item if it's still present
+        if self.dropdown.findText("Select a course") != -1:
+            self.dropdown.removeItem(0)
+
     def display_coursename(self):
-        # Connect to the database
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='kuhu2004',
-            database='cascade_project'
-        )
+        # Connect to the SQLite database
+        conn = sqlite3.connect('cascade_project.db')
         
         # Fetch the course name from the table
-        cursor = conn.cursor(buffered=True)
+        cursor = conn.cursor()
         cursor.execute("SELECT name FROM courses")
         course_name = cursor.fetchall()
                 
         for i in range(len(course_name)):
-                # Check if a course name was fetched
-                if course_name[i]:
-                        # Dynamically set the course name to the label
-                        getattr(self, 'course' + str(i+1)).setText(course_name[i][0])
-                else:
-                        break
+            # Check if a course name was fetched
+            if course_name[i]:
+                # Dynamically set the course name to the label
+                getattr(self, 'course' + str(i+1)).setText(course_name[i][0])
+            else:
+                break
 
-        
         cursor.close()
         conn.close()
-                       
 
+    def handle_selection_change(self, index):
+        selected_domain = self.dropdown.currentText()
+        if selected_domain != "Select your domain":
+            self.store_choice(selected_domain)
 
+    def store_choice(self, selected_domain):
+        conn = sqlite3.connect('cascade_project.db')
+        cursor = conn.cursor()
+
+        # Check if there is already a selection
+        cursor.execute("SELECT * FROM user_choice")
+        row = cursor.fetchone()
+        
+        if row:
+                # Update the existing entry
+                cursor.execute("UPDATE user_choice SET domain = ?", (selected_domain,))
+        else:
+                # Insert a new entry
+                cursor.execute("INSERT INTO user_choice (domain) VALUES (?)", (selected_domain,))
+        
+        conn.commit()  # Commit changes to the database
+        conn.close()
+
+    def load_choice(self):
+        conn = sqlite3.connect('cascade_project.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT domain FROM user_choice ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            self.dropdown.setCurrentText(row[0])
+        conn.close()
+
+    def delete_course(self, event):
+        """Opens a dialog to choose a course for deletion."""
+        # Create a dialog box
+        dialog = QDialog(self.widget)
+        dialog.setWindowTitle("Delete Course")
+        dialog.setStyleSheet("background-color: rgb(167, 145, 203); color: rgb(255,255,255); font: 10pt 'Montserrat';")
+
+        # Create a layout for the dialog
+        layout = QVBoxLayout()
+
+        # Create a label for the dropdown
+        label = QLabel("Select Course to Delete:")
+        label.setStyleSheet("background-color: rgb(167, 145, 203); color: rgb(255,255,255); font: 10pt 'Montserrat';")
+        layout.addWidget(label)
+
+        # Create a combobox for course selection
+        self.course_dropdown = QComboBox(dialog)
+        self.populate_course_dropdown()  # Populate with courses from database
+        layout.addWidget(self.course_dropdown)
+
+        # Create an OK button
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(lambda: self.confirm_delete(dialog))
+        layout.addWidget(ok_button)
+
+        # Set the layout for the dialog
+        dialog.setLayout(layout)
+
+        # Show the dialog
+        dialog.exec_()
+
+    def populate_course_dropdown(self):
+        """Fills the course dropdown with data from the database."""
+        conn = sqlite3.connect('cascade_project.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM courses")
+        courses = cursor.fetchall()
+        conn.close()
+
+        self.course_dropdown.addItems([course[0] for course in courses])
+
+    def confirm_delete(self, dialog):
+        """Confirms the deletion and updates the GUI."""
+        selected_course = self.course_dropdown.currentText()
+
+        if selected_course:
+            msg_box = CustomMessageBox(self.widget)
+            msg_box.setWindowTitle("Confirm Delete") 
+            msg_box.setIcon(QMessageBox.Question)
+            msg_box.setText(f'Are you sure you want to delete {selected_course}?')
+            msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            msg_box.button(QMessageBox.Yes).setFixedSize(150, 40) 
+            msg_box.button(QMessageBox.No).setFixedSize(150, 40)
+            msg_box.setDefaultButton(QMessageBox.No)
+            reply = msg_box.exec_()
+
+            if reply == QMessageBox.Yes:
+                # Connect to the database
+                conn = sqlite3.connect('cascade_project.db')
+                cursor = conn.cursor()
+
+                # Delete the course from the database
+                cursor.execute("DELETE FROM courses WHERE name = ?", (selected_course,))
+                conn.commit()
+                conn.close()
+
+                # Update the GUI
+                self.refresh_courses() # Refresh the course names
+                dialog.close()  # Close the dialog box
+        else:
+            QMessageBox.warning(self.widget, "Error", "Please select a course to delete.")
+
+        
+    def update_courses(self):
+        """Emits the course_updated_signal to trigger a refresh."""
+        self.course_updated_signal.emit()
+
+class CustomMessageBox(QMessageBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""
+            QMessageBox {
+                background-color: rgb(167, 145, 203);
+                color: rgb(225,225,225);
+            }
+            QMessageBox QLabel {
+                font: 10pt "Montserrat";
+                color: rgb(225,225,225);
+            }
+            QMessageBox QPushButton {
+                background-color: rgb(187, 165, 223);
+                color: white;
+                border-radius: 5px;
+                font-weight:500;
+            }
+        """)
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
     settings = QtWidgets.QMainWindow()
-    ui = Ui_settings()
+    ui = Ui_settings(settings)
     ui.setupUi(settings)
     settings.show()
     sys.exit(app.exec_())
