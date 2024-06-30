@@ -9,13 +9,19 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 import resourcesCascade
-import mysql.connector
+import sqlite3
+from PyQt5.QtCore import QTime
+import base64
+import vertexai
+from vertexai.generative_models import GenerativeModel, Part
+import vertexai.preview.generative_models as generative_models
+import re
 
 class Ui_study_plan(object):
     def setupUi(self, study_plan):
         study_plan.setObjectName("study_plan")
         study_plan.resize(1199, 869)
-        study_plan.setStyleSheet("background-color: rgb(37, 60, 105);")
+        study_plan.setStyleSheet("background-color: rgb(27, 32, 81);")
         self.centralwidget = QtWidgets.QWidget(study_plan)
         self.centralwidget.setObjectName("centralwidget")
         self.bg = QtWidgets.QLabel(self.centralwidget)
@@ -235,12 +241,57 @@ class Ui_study_plan(object):
 "color: rgb(195, 195, 195);")
         self.whole_studyplan_output.setObjectName("whole_studyplan_output")
         self.enter_button = QtWidgets.QPushButton(self.centralwidget)
-        self.enter_button.setGeometry(QtCore.QRect(660, 740, 93, 28))
-        self.enter_button.setStyleSheet("font: 8pt \"Montserrat\";\n"
+        self.enter_button.setGeometry(QtCore.QRect(260, 740, 261, 31))
+        self.enter_button.setStyleSheet("font: 13pt \"Montserrat\";\n"
 "background-color: rgb(87, 60, 138);\n"
-"color: rgb(195, 195, 195);")
+"color: rgb(195, 195, 195);\n"
+"border:none;")
         self.enter_button.setObjectName("enter_button")
-        self.enter_button.clicked.connect(self.inputs)
+        self.enter_button.clicked.connect(self.multiturn_generate_content)
+
+        self.left_button = QtWidgets.QPushButton(self.centralwidget)
+        self.left_button.setGeometry(QtCore.QRect(230, 740, 41, 31))
+        font = QtGui.QFont()
+        font.setFamily("Montserrat")
+        font.setPointSize(8)
+        font.setBold(False)
+        font.setItalic(False)
+        font.setWeight(50)
+        font.setKerning(True)
+        self.left_button.setFont(font)
+        self.left_button.setStyleSheet("font: 8pt \"Montserrat\";\n"
+"background-color: rgb(87, 60, 138);\n"
+"color: rgb(195, 195, 195);\n"
+"birder:none;\n"
+"border-radius: 7px;")
+        self.left_button.setText("")
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap(":/images/images for cascade/starsss.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.left_button.setIcon(icon)
+        self.left_button.setIconSize(QtCore.QSize(30, 30))
+        self.left_button.setObjectName("left_button")
+        self.left_button.clicked.connect(self.multiturn_generate_content)
+
+        self.pushButton_2 = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_2.setGeometry(QtCore.QRect(510, 740, 41, 31))
+        font = QtGui.QFont()
+        font.setFamily("Montserrat")
+        font.setPointSize(8)
+        font.setBold(False)
+        font.setItalic(False)
+        font.setWeight(50)
+        font.setKerning(True)
+        self.pushButton_2.setFont(font)
+        self.pushButton_2.setStyleSheet("font: 8pt \"Montserrat\";\n"
+"background-color: rgb(87, 60, 138);\n"
+"color: rgb(195, 195, 195);\n"
+"border-radius:7px;")
+        self.pushButton_2.setText("")
+        self.pushButton_2.setIcon(icon)
+        self.pushButton_2.setIconSize(QtCore.QSize(30, 30))
+        self.pushButton_2.setObjectName("pushButton_2")
+        self.pushButton_2.clicked.connect(self.multiturn_generate_content)
+
         self.bg.raise_()
         self.main_title.raise_()
         self.bg_box1.raise_()
@@ -267,7 +318,16 @@ class Ui_study_plan(object):
         self.from_title.raise_()
         self.free_hours_output.raise_()
         self.whole_studyplan_output.raise_()
+        self.label_behind_button = QtWidgets.QLabel(self.centralwidget)
+        self.label_behind_button.setGeometry(QtCore.QRect(240, 750, 321, 31))
+        self.label_behind_button.setStyleSheet("background-color: rgb(58, 40, 93);\n"
+"border-radius:7px;")
+        self.label_behind_button.setText("")
+        self.label_behind_button.setObjectName("label_behind_button")
+        self.label_behind_button.raise_()
         self.enter_button.raise_()
+        self.pushButton_2.raise_()
+        self.left_button.raise_()
         study_plan.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(study_plan)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1199, 26))
@@ -282,7 +342,9 @@ class Ui_study_plan(object):
 
     def retranslateUi(self, study_plan):
         _translate = QtCore.QCoreApplication.translate
-        study_plan.setWindowTitle(_translate("study_plan", "MainWindow"))
+        icon = QtGui.QIcon(":/images/images for cascade/dark_study_icon.png")
+        study_plan.setWindowIcon(icon)
+        study_plan.setWindowTitle(_translate("study_plan", "Study Plan"))
         self.main_title.setText(_translate("study_plan", "Create Study Plan"))
         self.select_course_title.setText(_translate("study_plan", "Select Course"))
         self.specify_date_title.setText(_translate("study_plan", "Specify date constraint"))
@@ -295,25 +357,21 @@ class Ui_study_plan(object):
         self.start_time_title.setText(_translate("study_plan", "START:"))
         self.end_time_title.setText(_translate("study_plan", "END:"))
         self.from_title.setText(_translate("study_plan", "from"))
-        self.enter_button.setText(_translate("study_plan", "Enter"))
+        self.enter_button.setText(_translate("study_plan", "Generate Study Plan!"))
 
+    
     def display_courses(self):
-        # Connect to the database
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='kuhu2004',
-            database='cascade_project'
-        )
+        # Connect to the SQLite database
+        conn = sqlite3.connect('cascade_project.db')
         
         # Fetch the course name from the table
-        cursor = conn.cursor(buffered=True)
+        cursor = conn.cursor()
         cursor.execute("SELECT name FROM courses")
         course_name = cursor.fetchall()
-        course_list=[]
+        course_list = []
                 
-        for i in range(len(course_name)):
-                course_list.append(course_name[i][0])
+        for name in course_name:
+                course_list.append(name[0])
 
         cursor.close()
         conn.close()
@@ -337,58 +395,157 @@ class Ui_study_plan(object):
         current_end_time = self.end_time.time()  # This returns a QTime object
         formatted_end_time = current_end_time.toString("HH:mm:ss")  # Format the time as a string
 
+        parsed_start_time = QTime.fromString(formatted_start_time, "HH:mm:ss")
+        parsed_end_time = QTime.fromString(formatted_end_time, "HH:mm:ss")
+        formatted_start_time_12hr = parsed_start_time.toString("h:mm AP")
+        formatted_end_time_12hr = parsed_end_time.toString("h:mm AP")
+
         #selected_day = self.day_dropdown.currentText()  
-        current_text = self.free_hours_output.text()  # Get the current text of the label
+        current_text = self.free_hours_output.text()
+        parsed_time = QTime.fromString(current_text, "H:mm")
+        formatted_time = parsed_time.toString("h:mm AP")
         if current_text:
                 # Append the new day with a space if the label already has text
-                self.free_hours_output.setText(current_text + ' ' + formatted_start_time + '-' + formatted_end_time)
+                self.free_hours_output.setText(current_text + ' and ' + formatted_start_time_12hr + ' to ' + formatted_end_time_12hr)
         else:
                 # Set the text of the label to the selected item if the label is empty
-                self.free_hours_output.setText(formatted_start_time + '-' + formatted_end_time)
-
+                self.free_hours_output.setText(formatted_start_time_12hr + ' to ' + formatted_end_time_12hr)
 
     def save_information(self,subject, syllabus, study_period, availability_days, time_slots, ability_score):
-        prompt_input=f"Create a study plan for {subject} covering {syllabus}. The study period is from {study_period} with availability on {availability_days} from {time_slots}. User ability score: {ability_score}."
+        prompt_input=f"Create a study plan :- \nSyllabus: {syllabus} \nStudy Period: {study_period} \nAvailability: {availability_days} at {time_slots} \nUser ability score: {ability_score}"
         return(prompt_input)
-        
+    
     def inputs(self):
-        # Connect to the database
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='kuhu2004',
-            database='cascade_project'
-        )
-        cursor = conn.cursor(buffered=True)
+        def format_days(selected_days_str):
+                selected_days = selected_days_str.split()
+                num_days = len(selected_days)
+                
+                if num_days == 0:
+                        return ""
+                elif num_days == 1:
+                        return selected_days[0]
+                elif num_days == 2:
+                        return f"{selected_days[0]} and {selected_days[1]}"
+                else:
+                        return f"{', '.join(selected_days[:-1])} and {selected_days[-1]}"
+        
+        # Connect to the SQLite database
+        conn = sqlite3.connect('cascade_project.db')
+        cursor = conn.cursor()
 
         subject = self.course_dropdown.currentText()
 
-        cursor.execute("SELECT syllabus FROM courses where name = %s",(subject,))
-        syllabus = cursor.fetchall()[0][0]
+        # Use a parameterized query with SQLite's placeholder '?'
+        cursor.execute("SELECT syllabus FROM courses WHERE name = ?", (subject,))
+        syllabus_row = cursor.fetchone()
+        syllabus = syllabus_row[0] if syllabus_row else 'N/A'
+
 
         study_period = self.start_date.date().toString("MMMM d") + " to " + self.end_date.date().toString("MMMM d")
 
-        availability_days = self.free_days_output.text()
+        yeaah=self.free_days_output.text()
+
+        availability_days = format_days(yeaah)
 
         time_slots = self.free_hours_output.text()
 
         ability_score = 6
         
-        if ability_score < 1:
-                ability_score = 1
-        if ability_score > 15:
-                ability_score = 15
+        # Clamp the ability score to the range [1, 15]
+        ability_score = max(1, min(ability_score, 15))
         
         if availability_days.lower() == "everyday":
-                availability_days= "Monday Tuesday Wednesday Thursday Friday Saturday Sunday"
+                availability_days = "Monday Tuesday Wednesday Thursday Friday Saturday Sunday"
 
+        # Ensure to handle the save_information method accordingly
         return self.save_information(subject, syllabus, study_period, availability_days, time_slots, ability_score)
     
+    def multiturn_generate_content(self):
+        self.text1_1 = self.inputs()
+        textsi_1 = """Create a study plan in using the following these instructions:
+ 
+The user will provide:-
+Syllabus (content to be covered).
+Study period (start date to end date).
+Availability (specific days and time slots).
+User ability score (1 to 15, where 15 is master level and 1 is most improvement needed). Decide user workload depending on this core. The higher the score the lower the workload
+
+
+IMPORTANT:-
+1. You need to check the Availability and time slots given properly and only provide study for those which are mentioned by the user. 
+2. You need to ensure proper consistent Formatting of \"#\" and \"*\" . for eg: ## before Course Title, ### before Week number, #### before Day, * before Time Slot.
+
+
+Example input:
+Create a study plan:-
+Syllabus :- {User will input syllabus you need to distribute workload according to it}
+Study period: {User will specifystart date to end date}
+Availability: {User will specify days and time slots}
+User-ability score: 15
+ 
+ 
+ 
+Example output:
+ 
+\"## Introduction to Web System Study Plan (March 20 - April 15):\\\\n\\\\n### Week 1 (March 20 - March 26):\\\\n\\\\n#### Monday (March 20):\\\\n* 10:30 AM - 12:30 PM: Internet Overview, WWW, and Web Protocols - Understand the basics of the Internet, the World Wide Web, and the essential web protocols.\\\\n* 4:30 PM - 7:30 PM: Web Browsers and Web Servers - Learn about different web browsers, their functions, and how web servers operate.\\\\n\\\\n#### Wednesday (March 22):\\\\n* 10:30 AM - 12:30 PM: Web System Architecture - Study the architecture of web systems, including the client-server model.\\\\n* 4:30 PM - 7:30 PM: URL and Domain Name - Understand the structure and function of URLs and domain names.\\\\n\\\\n#### Friday (March 24):\\\\n* 10:30 AM - 12:30 PM: Client and Server-side Scripting - Introduction to scripting on both client and server sides.\\\\n* 4:30 PM - 7:30 PM: HTML5 Basics and Formatting - Start with the basics of HTML5 and learn about text formatting.\\\\n\\\\n### Week 2 (March 27 - April 2):\\\\n\\\\n#### Monday (March 27):\\\\n* 10:30 AM - 12:30 PM: HTML5 Colors, Images, and Links - Learn how to add colors, images, and links to a webpage.\\\\n* 4:30 PM - 7:30 PM: HTML5 Tables, Lists, and Layout - Understand how to create tables, lists, and layout structures in HTML5.\\\\n\\\\n#### Wednesday (March 29):\\\\n* 10:30 AM - 12:30 PM: HTML5 Forms, Canvas, and Media - Learn about creating forms, using the canvas element, and embedding media.\\\\n* 4:30 PM - 7:30 PM: CSS3 Basics and Selectors - Introduction to CSS3, including basic syntax and selectors.\\\\n\\\\n#### Friday (March 31):\\\\n* 10:30 AM - 12:30 PM: CSS3 Box Model, Backgrounds, and Borders - Understand the box model, and learn how to style backgrounds and borders.\\\\n* 4:30 PM - 7:30 PM: CSS3 Text Effects and Advanced Features - Explore text effects and advanced CSS3 features.\\\\n\\\\n### Week 3 (April 3 - April 9):\\\\n\\\\n#### Monday (April 3):\\\\n* 10:30 AM - 12:30 PM: JavaScript Basics and Functions - Learn the basics of JavaScript and how to define and use functions.\\\\n* 4:30 PM - 7:30 PM: JavaScript Arrays and DOM - Understand arrays in JavaScript and how to manipulate the DOM.\\\\n\\\\n#### Wednesday (April 5):\\\\n* 10:30 AM - 12:30 PM: JavaScript Built-in Objects and Regular Expressions - Learn about JavaScript\\\'s built-in objects and the use of regular expressions.\\\\n* 4:30 PM - 7:30 PM: Event Handling and Validation - Understand event handling in JavaScript and form validation techniques.\\\\n\\\\n#### Friday (April 7):\\\\n* 10:30 AM - 12:30 PM: JSON Basics and jQuery Basics - Introduction to JSON and jQuery basics.\\\\n* 4:30 PM - 7:30 PM: jQuery Plugins - Learn about jQuery plugins and how to use them.\\\\n\\\\n### Week 4 (April 10 - April 15):\\\\n\\\\n#### Monday (April 10):\\\\n* 10:30 AM - 12:30 PM:  Review and Practice -  Revisit key concepts from HTML, CSS, and JavaScript. Practice building simple web pages and implementing basic functionalities.\\\\n* 4:30 PM - 7:30 PM: Project Planning - Choose a small web development project that you want to work on. Plan the project scope, functionalities, and technologies you will use.\\\\n\\\\n#### Wednesday (April 12):\\\\n* 10:30 AM - 12:30 PM: Project Development -  Start building your project, focusing on HTML, CSS, and basic JavaScript interactions.\\\\n* 4:30 PM - 7:30 PM: Project Development (Continued) - Continue building your project, adding more features and refining the design.\\\\n\\\\n#### Friday (April 14):\\\\n* 10:30 AM - 12:30 PM: Project Finalization - Complete your project, debug any issues, and ensure all functionalities work as expected.\\\\n* 4:30 PM - 7:30 PM: Project Presentation/Review - Present your project to a peer or mentor, or conduct a self-review to assess your progress and identify areas for improvement.\\\\n\\\\n#### Note:\\\\nThe user has a score of 10, which indicates moderate proficiency. This study plan provides a structured approach to cover the syllabus, incorporating both theoretical learning and practical project work. It is suggested to review the material and complete additional practice exercises as needed.\\\""""
+
+        vertexai.init(project="673460396526", location="us-central1")
+        model = GenerativeModel(
+            "projects/673460396526/locations/us-central1/endpoints/3677037363143376896",
+    system_instruction=[textsi_1]
+        )
+        chat = model.start_chat()
+        generation_config = {
+        "max_output_tokens": 8192,
+        "temperature": 1,
+        "top_p": 0.95,
+        }
+
+        safety_settings = {
+        generative_models.HarmCategory.HARM_CATEGORY_HATE_SPEECH: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        generative_models.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        generative_models.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        generative_models.HarmCategory.HARM_CATEGORY_HARASSMENT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        }
+
+        response = chat.send_message([self.text1_1],generation_config=generation_config,
+      safety_settings=safety_settings)
+
+        if hasattr(response, 'candidates') and len(response.candidates) > 0:
+            # Extract the text content from the first candidate
+            content = response.candidates[0].content.parts[0].text
+        else:  
+            print("No candidates found in the response.")
+
+  
+        conn = sqlite3.connect('cascade_project.db')
+        cursor = conn.cursor()
+        subject = self.course_dropdown.currentText()
+
+        cursor.execute("SELECT plan FROM study_plan WHERE name = ?", (subject,))
+        existing_plan = cursor.fetchone()
+
+        study_period = self.start_date.date().toString("MMMM d") + " to " + self.end_date.date().toString("MMMM d")
+        availability_day = self.free_days_output.text().split()
+        availability_days=str(availability_day)
+
+        if existing_plan:
+                # Subject exists, update the plan
+                cursor.execute("UPDATE study_plan SET plan = ? WHERE name = ?", (content, subject))
+        else:
+                # Subject doesn't exist, insert a new row
+                cursor.execute("INSERT INTO study_plan (name, plan, study_period, avail) VALUES (?, ?,?,?)", (subject, content, study_period, availability_days))
+
+        conn.commit()
+        conn.close()
+
+        self.whole_studyplan_output.setPlainText(str(content))
 
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
     study_plan = QtWidgets.QMainWindow()
+    app.setStyle("Windows")
     ui = Ui_study_plan()
     ui.setupUi(study_plan)
     study_plan.show()
